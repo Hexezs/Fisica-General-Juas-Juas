@@ -161,247 +161,232 @@
   </dialog>
 
   <!-- Dependencia ligera para generar QR (funciona en GitHub Pages) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-Mn0ZrXH5iXl7O3Zbq8t50zvVd1Yk+7wZ9u2xqk9XfGk7bZk3w6wUq6XHkM2Y0VjY5K0aSuk4rxG2xL0b5H0xAQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-Mn0ZrXH5iXl7O3Zbq8t50zvVd1Yk+7wZ9u2xqk9XfGk7bZk3w6wUq6XHkM2Y0VjY5K0aSuk4rxG2xL0b5H0xAQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  <script>
-    /*
-     * Cómo usar este hub
-     * 1) Sube este index.html a tu GitHub Pages (idealmente al repo username.github.io o a /hub/).
-     * 2) Edita el arreglo SIMULADORES para agregar/quitar enlaces.
-     * 3) Escanea el QR del hub (botón arriba) para compartir un único código.
-     */
+<script>
+/* === Hub de simuladores – Rafael Moreno Bañaga === */
 
-    // === 1) Lista editable de tus simuladores ===
-    const SIMULADORES = [
-      // Estructura recomendada de carpetas (en tu repo):
-      // /simuladores/mru/index.html
-      // /simuladores/mruv/index.html
-      // /simuladores/mesa-fuerzas/index.html
-      // /simuladores/optica/index.html
-      // Cambia los paths a los que uses realmente.
-      {
-        titulo: "Simulador MRU",
-        path: "simuladores/mru/index.html",
-        descripcion: "Movimiento Rectilíneo Uniforme: x(t) = x₀ + vt.",
-        tags: ["Cinemática","MRU","1D"]
-      },
-      {
-        titulo: "Simulador MRUV / Segunda Ley de Newton",
-        path: "simuladores/mruv/index.html",
-        descripcion: "Aceleración, fuerzas y variación de velocidad en el tiempo.",
-        tags: ["Cinemática","MRUV","Fuerzas"]
-      },
-      {
-        titulo: "Simulador – Mesa de Fuerzas",
-        path: "simuladores/mesa-fuerzas/index.html",
-        descripcion: "Composición de vectores de tensión y equilibrio.",
-        tags: ["Fuerzas","Vectores","Equilibrio"]
-      },
-      {
-        titulo: "Simulador – Óptica Geométrica",
-        path: "simuladores/optica/index.html",
-        descripcion: "Reflexión/recorrido de rayos (ajústalo a tu versión).",
-        tags: ["Óptica","Geometría","Rayos"]
-      }
-      // Agrega más objetos aquí siguiendo el mismo formato
-    ];
+// === 1) Lista editable de simuladores ===
+const SIMULADORES = [
+  {
+    titulo: "Simulador MRU",
+    path: "simuladores/mru/index.html",
+    descripcion: "Movimiento Rectilíneo Uniforme: x(t) = x₀ + vt.",
+    tags: ["Cinemática","MRU","1D"]
+  },
+  {
+    titulo: "Simulador MRUV / Segunda Ley de Newton",
+    path: "simuladores/mruv/index.html",
+    descripcion: "Aceleración, fuerzas y variación de velocidad en el tiempo.",
+    tags: ["Cinemática","MRUV","Fuerzas"]
+  },
+  {
+    titulo: "Simulador – Mesa de Fuerzas",
+    path: "simuladores/mesa-fuerzas/index.html",
+    descripcion: "Composición de vectores de tensión y equilibrio.",
+    tags: ["Fuerzas","Vectores","Equilibrio"]
+  },
+  {
+    titulo: "Simulador – Óptica Geométrica",
+    path: "simuladores/optica/index.html",
+    descripcion: "Reflexión y refracción de rayos luminosos.",
+    tags: ["Óptica","Geometría","Rayos"]
+  }
+];
 
-    // Derivar conjunto de etiquetas para filtros
-    const ALL_TAGS = [...new Set(SIMULADORES.flatMap(s => s.tags))].sort((a,b)=>a.localeCompare(b,'es'));
-    const state = { query: "", activeTags: new Set() };
+// === 2) Configuración base ===
+const ALL_TAGS = [...new Set(SIMULADORES.flatMap(s => s.tags))].sort((a,b)=>a.localeCompare(b,'es'));
+const state = { query: "", activeTags: new Set() };
 
-    const els = {
-      grid: document.getElementById('grid'),
-      count: document.getElementById('count'),
-      filters: document.getElementById('filters'),
-      q: document.getElementById('q'),
-      showQR: document.getElementById('showQR'),
-      shareBtn: document.getElementById('shareBtn'),
-      qrModal: document.getElementById('qrModal'),
-      hubURL: document.getElementById('hubURL'),
-      copyURL: document.getElementById('copyURL'),
-      downloadQR: document.getElementById('downloadQR'),
-      closeQR: document.getElementById('closeQR'),
-      // Visor integrado
-      viewerSection: document.getElementById('viewerSection'),
-      viewer: document.getElementById('viewer'),
-      viewerTitle: document.getElementById('viewerTitle'),
-      openNewTab: document.getElementById('openNewTab'),
-      backHub: document.getElementById('backHub')
-    };
+const els = {
+  grid: document.getElementById('grid'),
+  count: document.getElementById('count'),
+  filters: document.getElementById('filters'),
+  q: document.getElementById('q'),
+  showQR: document.getElementById('showQR'),
+  shareBtn: document.getElementById('shareBtn'),
+  qrModal: document.getElementById('qrModal'),
+  hubURL: document.getElementById('hubURL'),
+  copyURL: document.getElementById('copyURL'),
+  downloadQR: document.getElementById('downloadQR'),
+  closeQR: document.getElementById('closeQR'),
+  // Visor integrado
+  viewerSection: document.getElementById('viewerSection'),
+  viewer: document.getElementById('viewer'),
+  viewerTitle: document.getElementById('viewerTitle'),
+  openNewTab: document.getElementById('openNewTab'),
+  backHub: document.getElementById('backHub')
+};
 
-    // === 2) Render de filtros ===
-    function renderFilters(){
-      els.filters.innerHTML = '';
-      const label = document.createElement('span');
-      label.className = 'small';
-      label.textContent = 'Filtrar por tema:';
-      els.filters.appendChild(label);
+// === 3) Render de filtros ===
+function renderFilters(){
+  els.filters.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'small';
+  label.textContent = 'Filtrar por tema:';
+  els.filters.appendChild(label);
 
-      ALL_TAGS.forEach(tag => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'chip';
-        chip.textContent = tag;
-        chip.addEventListener('click', () => {
-          if(state.activeTags.has(tag)) state.activeTags.delete(tag); else state.activeTags.add(tag);
-          chip.classList.toggle('active');
-          renderGrid();
-        });
-        els.filters.appendChild(chip);
-      });
-
-      // botón para limpiar filtros
-      const clear = document.createElement('button');
-      clear.type = 'button';
-      clear.className = 'chip';
-      clear.textContent = 'Limpiar filtros';
-      clear.addEventListener('click', ()=>{ state.activeTags.clear(); document.querySelectorAll('.chip.active').forEach(c=>c.classList.remove('active')); renderGrid(); })
-      els.filters.appendChild(clear);
-    }
-
-    // === 3) Render de tarjetas ===
-    function renderGrid(){
-      const q = state.query.trim().toLowerCase();
-      const byQuery = s => !q || (
-        s.titulo.toLowerCase().includes(q) ||
-        s.descripcion.toLowerCase().includes(q) ||
-        s.tags.some(t => t.toLowerCase().includes(q))
-      );
-      const byTags = s => state.activeTags.size === 0 || [...state.activeTags].every(t => s.tags.includes(t));
-
-      const results = SIMULADORES.filter(s => byQuery(s) && byTags(s));
-      els.count.textContent = results.length;
-
-      if(results.length === 0){
-        els.grid.innerHTML = '<div class="empty">No hay simuladores que coincidan. Prueba quitando filtros o revisa la búsqueda.</div>';
-        return;
-      }
-
-      els.grid.innerHTML = results.map(s => {
-        const slug = slugOf(s);
-        return `
-          <article class="card">
-            <div>
-              <h3>${escapeHTML(s.titulo)}</h3>
-              <p>${escapeHTML(s.descripcion)}</p>
-              <div class="tags">${s.tags.map(t=>`<span class="tag">${escapeHTML(t)}</span>`).join('')}</div>
-            </div>
-            <div class="open">
-              <button class="btn openBtn" data-slug="${slug}">Abrir aquí</button>
-              <a class="btn secondary" href="${s.path}" target="_blank" rel="noopener">Nueva pestaña</a>
-            </div>
-          </article>`
-      }).join('');
-
-      // enlazar botones "Abrir aquí"
-      document.querySelectorAll('.openBtn').forEach(btn => {
-        const slug = btn.getAttribute('data-slug');
-        const sim = SLUG_MAP[slug];
-        btn.addEventListener('click', ()=> openViewer(sim));
-      });
-    }
-
-      els.grid.innerHTML = results.map(s => `
-        <article class="card">
-          <div>
-            <h3>${escapeHTML(s.titulo)}</h3>
-            <p>${escapeHTML(s.descripcion)}</p>
-            <div class="tags">${s.tags.map(t=>`<span class="tag">${escapeHTML(t)}</span>`).join('')}</div>
-          </div>
-          <div class="open">
-            <a class="btn" href="${s.url}" target="_blank" rel="noopener">Abrir →</a>
-            <a class="btn secondary" href="${s.url}" target="_blank" rel="noopener">Nueva pestaña</a>
-          </div>
-        </article>
-      `).join('');
-    }
-
-    // === 3.5) Visor integrado (iframe) ===
-    function slugOf(s){
-      if(s.slug) return s.slug;
-      const m = String(s.path||'').match(/([^\/]+)\/index\.html$/);
-      return (m ? m[1] : s.titulo).toLowerCase().replace(/[^a-z0-9]+/gi,'-');
-    }
-    const SLUG_MAP = Object.create(null);
-    SIMULADORES.forEach(s => SLUG_MAP[slugOf(s)] = s);
-
-    function openViewer(sim){
-      if(!sim) return;
-      const url = sim.path;
-      els.viewerTitle.textContent = sim.titulo;
-      els.viewer.src = url;
-      els.openNewTab.href = url;
-      els.viewerSection.classList.remove('hidden');
-      els.viewerSection.scrollIntoView({behavior:'smooth', block:'start'});
-      const slug = slugOf(sim);
-      if(!location.hash.endsWith(slug)) location.hash = `sim/${slug}`;
-    }
-    function closeViewer(){
-      els.viewer.src = '';
-      els.viewerSection.classList.add('hidden');
-      if(/^#?sim\//i.test(location.hash)) history.pushState('', document.title, location.pathname + location.search);
-    }
-    els.backHub && els.backHub.addEventListener('click', closeViewer);
-
-    function handleHashRoute(){
-      const m = location.hash.match(/^#?sim\/(.+)$/i);
-      if(m && SLUG_MAP[m[1]]){
-        openViewer(SLUG_MAP[m[1]]);
-      } else {
-        closeViewer();
-      }
-    }
-    window.addEventListener('hashchange', handleHashRoute);
-
-    // === 4) Búsqueda ===
-    els.q.addEventListener('input', e=>{ state.query = e.target.value; renderGrid(); });
-    // atajo "/" para enfocar búsqueda
-    window.addEventListener('keydown', (e)=>{ if(e.key === '/' && document.activeElement !== els.q){ e.preventDefault(); els.q.focus(); } });
-
-    // === 5) Compartir y QR ===
-    function openQR(){
-      els.hubURL.value = location.href;
-      if(window.QRCode){
-        const container = document.getElementById('qrcode');
-        container.innerHTML = '';
-        const qr = new QRCode(container, { text: location.href, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.H });
-        els.qrModal.showModal();
-      } else {
-        alert('No se pudo cargar el generador de QR. Revisa tu conexión.');
-      }
-    }
-
-    els.showQR.addEventListener('click', openQR);
-    els.closeQR.addEventListener('click', ()=> els.qrModal.close());
-    els.copyURL.addEventListener('click', async ()=>{
-      try { await navigator.clipboard.writeText(els.hubURL.value); els.copyURL.textContent = 'Copiado ✓'; setTimeout(()=>els.copyURL.textContent='Copiar', 1200);} catch { /* ignore */ }
+  ALL_TAGS.forEach(tag => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = tag;
+    chip.addEventListener('click', () => {
+      if(state.activeTags.has(tag)) state.activeTags.delete(tag); 
+      else state.activeTags.add(tag);
+      chip.classList.toggle('active');
+      renderGrid();
     });
+    els.filters.appendChild(chip);
+  });
 
-    els.downloadQR.addEventListener('click', ()=>{
-      const canvas = document.querySelector('#qrcode canvas');
-      if(!canvas) return;
-      const link = document.createElement('a');
-      link.download = 'QR-Hub-Simuladores.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    });
-
-    els.shareBtn.addEventListener('click', async ()=>{
-      const url = location.href;
-      try{
-        if(navigator.share){ await navigator.share({ title: document.title, text: 'Mis simuladores de física', url }); }
-        else { await navigator.clipboard.writeText(url); alert('Enlace copiado al portapapeles.'); }
-      }catch{}
-    });
-
-    // Utilidad para evitar inyectar HTML
-    function escapeHTML(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s])); }
-
-    // Inicializar
-    renderFilters();
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'chip';
+  clear.textContent = 'Limpiar filtros';
+  clear.addEventListener('click', ()=>{
+    state.activeTags.clear();
+    document.querySelectorAll('.chip.active').forEach(c=>c.classList.remove('active'));
     renderGrid();
-    handleHashRoute();
-  </script>
+  });
+  els.filters.appendChild(clear);
+}
+
+// === 4) Render de tarjetas ===
+function renderGrid(){
+  const q = state.query.trim().toLowerCase();
+  const byQuery = s => !q || (
+    s.titulo.toLowerCase().includes(q) ||
+    s.descripcion.toLowerCase().includes(q) ||
+    s.tags.some(t => t.toLowerCase().includes(q))
+  );
+  const byTags = s => state.activeTags.size === 0 || [...state.activeTags].every(t => s.tags.includes(t));
+
+  const results = SIMULADORES.filter(s => byQuery(s) && byTags(s));
+  els.count.textContent = results.length;
+
+  if(results.length === 0){
+    els.grid.innerHTML = '<div class="empty">No hay simuladores que coincidan. Prueba quitando filtros o revisa la búsqueda.</div>';
+    return;
+  }
+
+  els.grid.innerHTML = results.map(s => {
+    const slug = slugOf(s);
+    return `
+      <article class="card">
+        <div>
+          <h3>${escapeHTML(s.titulo)}</h3>
+          <p>${escapeHTML(s.descripcion)}</p>
+          <div class="tags">${s.tags.map(t=>`<span class="tag">${escapeHTML(t)}</span>`).join('')}</div>
+        </div>
+        <div class="open">
+          <button class="btn openBtn" data-slug="${slug}">Abrir aquí</button>
+          <a class="btn secondary" href="${s.path}" target="_blank" rel="noopener">Nueva pestaña</a>
+        </div>
+      </article>`;
+  }).join('');
+
+  document.querySelectorAll('.openBtn').forEach(btn => {
+    const slug = btn.getAttribute('data-slug');
+    const sim = SLUG_MAP[slug];
+    btn.addEventListener('click', ()=> openViewer(sim));
+  });
+}
+
+// === 5) Visor integrado (iframe) ===
+function slugOf(s){
+  if(s.slug) return s.slug;
+  const m = String(s.path||'').match(/([^\\/]+)\\/index\\.html$/);
+  return (m ? m[1] : s.titulo).toLowerCase().replace(/[^a-z0-9]+/gi,'-');
+}
+const SLUG_MAP = Object.create(null);
+SIMULADORES.forEach(s => SLUG_MAP[slugOf(s)] = s);
+
+function openViewer(sim){
+  if(!sim) return;
+  const url = sim.path;
+  els.viewerTitle.textContent = sim.titulo;
+  els.viewer.src = url;
+  els.openNewTab.href = url;
+  els.viewerSection.classList.remove('hidden');
+  els.viewerSection.scrollIntoView({behavior:'smooth', block:'start'});
+  const slug = slugOf(sim);
+  if(!location.hash.endsWith(slug)) location.hash = `sim/${slug}`;
+}
+function closeViewer(){
+  els.viewer.src = '';
+  els.viewerSection.classList.add('hidden');
+  if(/^#?sim\\//i.test(location.hash)) history.pushState('', document.title, location.pathname + location.search);
+}
+els.backHub && els.backHub.addEventListener('click', closeViewer);
+
+function handleHashRoute(){
+  const m = location.hash.match(/^#?sim\\/(.+)$/i);
+  if(m && SLUG_MAP[m[1]]){
+    openViewer(SLUG_MAP[m[1]]);
+  } else {
+    closeViewer();
+  }
+}
+window.addEventListener('hashchange', handleHashRoute);
+
+// === 6) Búsqueda ===
+els.q.addEventListener('input', e=>{ state.query = e.target.value; renderGrid(); });
+window.addEventListener('keydown', (e)=>{ 
+  if(e.key === '/' && document.activeElement !== els.q){ 
+    e.preventDefault(); els.q.focus(); 
+  } 
+});
+
+// === 7) Compartir y QR ===
+function openQR(){
+  els.hubURL.value = location.href;
+  if(window.QRCode){
+    const container = document.getElementById('qrcode');
+    container.innerHTML = '';
+    new QRCode(container, { text: location.href, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.H });
+    els.qrModal.showModal();
+  } else {
+    alert('No se pudo cargar el generador de QR. Revisa tu conexión.');
+  }
+}
+els.showQR.addEventListener('click', openQR);
+els.closeQR.addEventListener('click', ()=> els.qrModal.close());
+els.copyURL.addEventListener('click', async ()=>{
+  try { 
+    await navigator.clipboard.writeText(els.hubURL.value); 
+    els.copyURL.textContent = 'Copiado ✓'; 
+    setTimeout(()=>els.copyURL.textContent='Copiar', 1200);
+  } catch {}
+});
+els.downloadQR.addEventListener('click', ()=>{
+  const canvas = document.querySelector('#qrcode canvas');
+  if(!canvas) return;
+  const link = document.createElement('a');
+  link.download = 'QR-Hub-Simuladores.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+els.shareBtn.addEventListener('click', async ()=>{
+  const url = location.href;
+  try{
+    if(navigator.share){ await navigator.share({ title: document.title, text: 'Mis simuladores de física', url }); }
+    else { await navigator.clipboard.writeText(url); alert('Enlace copiado al portapapeles.'); }
+  }catch{}
+});
+
+// === Utilidad para sanitizar texto ===
+function escapeHTML(str){ 
+  return String(str).replace(/[&<>\"']/g, s => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#39;'
+  }[s]));
+}
+
+// === Inicializar ===
+renderFilters();
+renderGrid();
+handleHashRoute();
+</script>
+
 </body>
 </html>
