@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simulador MRU/MRUV — Minimal Black</title>
+  <style>
+    :root{
+      --bg:#000;
+      --panel:#0a0a0a;
+      --muted:#9ca3af;
+      --text:#f5f5f5;
+      --accent:#22d3ee;
+      --line:#222;
+      --ok:#10b981;
+      --warn:#f59e0b;
+      --err:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Segoe UI,Roboto,Ubuntu,Inter,sans-serif}
+    a{color:var(--accent);text-decoration:none}
+    h1{font-weight:700;margin:0 0 .5rem;font-size:clamp(20px,3vw,28px)}
+    h2{font-weight:600;margin:1.2rem 0 .6rem;font-size:clamp(16px,2.4vw,20px)}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
+
+    /* Nav */
+    .nav{display:flex;gap:8px;margin-bottom:16px}
+    .tab{padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer}
+    .tab[aria-selected="true"]{outline:1px solid var(--accent)}
+
+    /* Layout */
+    .grid{display:grid;grid-template-columns:370px 1fr;gap:16px;align-items:start}
+    @media (max-width:980px){.grid{grid-template-columns:1fr}}
+
+    /* Panel de control */
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    label{font-size:12px;color:var(--muted)}
+    input,select,button{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0e0e0e;color:var(--text)}
+    input::placeholder{color:#555}
+    .buttons{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .btn{cursor:pointer}
+    .btn.start{border-color:#113;border:1px solid var(--line)}
+    .btn.pause{border-color:#331}
+    .btn.reset{border-color:#311}
+
+    /* Indicadores */
+    .status{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+    .card{background:#0c0c0c;border:1px solid var(--line);border-radius:12px;padding:10px}
+    .card small{display:block;color:var(--muted);font-size:11px}
+    .mono{font-variant-numeric:tabular-nums}
+
+    /* Escena */
+    .scene{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+    .pista{position:relative;height:140px;border:1px dashed #1a1a1a;border-radius:12px;background:repeating-linear-gradient(90deg,#0f0f0f 0 30px,#111 30px 60px)}
+    .auto{position:absolute;left:0;bottom:26px;font-size:42px;filter:drop-shadow(0 2px 0 #000);transition:left .15s linear}
+    .marcador{position:absolute;left:8px;bottom:4px;color:var(--muted);font-size:12px}
+
+    /* Charts + tabla */
+    .charts{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+    .chart{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;height:260px}
+    canvas{display:block;width:100% !important;height:100% !important}
+
+    .table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;max-height:260px;overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    thead th{position:sticky;top:0;background:#0b0b0b;color:#bbb;border-bottom:1px solid var(--line);padding:8px;text-align:left;font-weight:600}
+    tbody td{border-bottom:1px dashed #111;padding:6px 8px;color:#ddd;font-variant-numeric:tabular-nums}
+
+    /* Teoría */
+    .page{display:none}
+    .page.active{display:block}
+    .teoria p{color:#d6d6d6}
+    .eq{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;background:#0c0c0c;border:1px solid var(--line);padding:8px;border-radius:8px;display:inline-block}
+    .list-compact li{margin:.25rem 0}
+
+    footer{margin:24px 0;color:#888;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Simulador de Movimiento Rectilíneo: MRU & MRUV</h1>
+      <div class="nav" role="tablist" aria-label="Pestañas">
+        <button class="tab" role="tab" id="tab-sim" aria-controls="sim" aria-selected="true">Simulador</button>
+        <button class="tab" role="tab" id="tab-teo" aria-controls="teoria" aria-selected="false">Teoría</button>
+      </div>
+    </header>
+
+    <!-- Página: Simulador -->
+    <section id="sim" class="page active" role="tabpanel" aria-labelledby="tab-sim">
+      <div class="grid">
+        <div class="panel" aria-label="Panel de control">
+          <h2>Controles</h2>
+          <div class="row" style="grid-template-columns:1fr 1fr 1fr;">
+            <div>
+              <label for="tipo">Tipo de movimiento</label>
+              <select id="tipo">
+                <option value="mru">MRU (a = 0)</option>
+                <option value="mruv" selected>MRUV (a = cte)</option>
+              </select>
+            </div>
+            <div>
+              <label for="x0">Posición inicial x₀ (m)</label>
+              <input id="x0" type="number" value="0" step="0.1" />
+            </div>
+            <div>
+              <label for="v0">Velocidad inicial v₀ (m/s)</label>
+              <input id="v0" type="number" value="5" step="0.1" />
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="a">Aceleración a (m/s²)</label>
+              <input id="a" type="number" value="1" step="0.1" />
+            </div>
+            <div>
+              <label for="dt">Δt paso de muestreo (s)</label>
+              <input id="dt" type="number" value="0.1" step="0.01" min="0.01" />
+            </div>
+            <div>
+              <label for="dur">Duración (s)</label>
+              <input id="dur" type="number" value="10" step="0.5" min="0.5" />
+            </div>
+          </div>
+          <div class="buttons">
+            <button class="btn start" id="start">Iniciar</button>
+            <button class="btn pause" id="pause">Pausar</button>
+            <button class="btn reset" id="reset">Reiniciar</button>
+          </div>
+
+          <!-- Presets / Pruebas rápidas -->
+          <div class="buttons" aria-label="Pruebas rápidas">
+            <button class="btn" data-test="mru-basico">Prueba MRU (v₀=5, a=0, 2s)</button>
+            <button class="btn" data-test="mruv-acelerando">Prueba MRUV (a=2, 2s)</button>
+            <button class="btn" data-test="mruv-frenado">Prueba Frenado (v₀=10, a=-5, 4s)</button>
+          </div>
+
+          <div class="status">
+            <div class="card"><small>t (s)</small><div class="mono" id="tOut">0.00</div></div>
+            <div class="card"><small>x (m)</small><div class="mono" id="xOut">0.00</div></div>
+            <div class="card"><small>v (m/s)</small><div class="mono" id="vOut">0.00</div></div>
+          </div>
+        </div>
+
+        <div class="scene">
+          <h2>Animación</h2>
+          <div class="pista" id="pista">
+            <div class="auto" id="auto" aria-label="auto">🚗</div>
+            <div class="marcador" id="escalaTxt">Escala dinámica</div>
+          </div>
+          <div class="charts">
+            <div class="chart"><h3 style="margin:0 0 8px;font-size:14px;color:#bbb">Posición vs tiempo</h3><canvas id="posChart"></canvas></div>
+            <div class="chart"><h3 style="margin:0 0 8px;font-size:14px;color:#bbb">Velocidad vs tiempo</h3><canvas id="velChart"></canvas></div>
+            <div class="chart"><h3 style="margin:0 0 8px;font-size:14px;color:#bbb">Aceleración vs tiempo</h3><canvas id="accChart"></canvas></div>
+          </div>
+          <div class="table-wrap" aria-label="Tabla de datos">
+            <table>
+              <thead>
+                <tr><th>t (s)</th><th>x (m)</th><th>v (m/s)</th><th>a (m/s²)</th></tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Página: Teoría -->
+    <section id="teoria" class="page teoria" role="tabpanel" aria-labelledby="tab-teo">
+      <div class="panel">
+        <h2>Conceptos y fórmulas utilizadas</h2>
+        <p>
+          <strong>Movimiento Rectilíneo Uniforme (MRU)</strong>: desplazamiento en línea recta con
+          <em>velocidad constante</em> y <em>aceleración nula</em>.
+        </p>
+        <ul class="list-compact">
+          <li><span class="eq">x(t) = x₀ + v₀ · t</span></li>
+          <li><span class="eq">v(t) = v₀</span></li>
+          <li><span class="eq">a(t) = 0</span></li>
+        </ul>
+        <p>
+          <strong>Movimiento Rectilíneo Uniformemente Variado (MRUV)</strong>: desplazamiento en línea
+          recta con <em>aceleración constante</em>. La velocidad cambia linealmente con el tiempo y la posición sigue
+          una relación cuadrática.
+        </p>
+        <ul class="list-compact">
+          <li><span class="eq">x(t) = x₀ + v₀ · t + (1/2) · a · t²</span></li>
+          <li><span class="eq">v(t) = v₀ + a · t</span></li>
+          <li><span class="eq">a(t) = a</span></li>
+        </ul>
+        <h2>Notas de uso</h2>
+        <ul class="list-compact">
+          <li>El paso <span class="eq">Δt</span> define cada cuánto se registran datos y se actualizan las gráficas.</li>
+          <li>La <span class="eq">duración</span> marca el tiempo total simulado. La animación ajusta la escala automáticamente para que el auto permanezca visible.</li>
+          <li>En MRU la aceleración se fija a <span class="eq">0</span>.</li>
+        </ul>
+        <h2>Unidades</h2>
+        <ul class="list-compact">
+          <li><span class="eq">x</span> en metros (m)</li>
+          <li><span class="eq">v</span> en metros por segundo (m/s)</li>
+          <li><span class="eq">a</span> en metros por segundo al cuadrado (m/s²)</li>
+          <li><span class="eq">t</span> en segundos (s)</li>
+        </ul>
+        <h2>Casos de prueba incluidos</h2>
+        <ul class="list-compact">
+          <li><strong>MRU básico</strong>: x₀=0, v₀=5 m/s, a=0, Δt=0.1 s, duración=2 s → x(2)=10 m, v(t)=5 m/s.</li>
+          <li><strong>MRUV acelerando</strong>: x₀=0, v₀=0, a=2 m/s², Δt=0.1 s, duración=2 s → x(2)=4 m, v(2)=4 m/s.</li>
+          <li><strong>MRUV frenado</strong>: x₀=0, v₀=10 m/s, a=-5 m/s², Δt=0.1 s, duración=4 s → v(2)=0 m/s, x(4)=? (se detiene en t=2 s y luego invierte si continúa).</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      Hecho por: <strong>Rafael Moreno Bañaga</strong>
+    </footer>
+  </div>
+
+  <!-- Librería para gráficas -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // --- Utilidades ---
+    const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
+    const approxEq = (a,b,eps=1e-6)=>Math.abs(a-b)<=eps;
+    function assert(cond,msg){ if(!cond){ console.error('❌ Prueba falló:', msg); } else { console.log('✅', msg); } }
+
+    // --- Elementos ---
+    const tipo = document.getElementById('tipo');
+    const x0Input = document.getElementById('x0');
+    const v0Input = document.getElementById('v0');
+    const aInput  = document.getElementById('a');
+    const dtInput = document.getElementById('dt');
+    const durInput= document.getElementById('dur');
+
+    const startBtn= document.getElementById('start');
+    const pauseBtn= document.getElementById('pause');
+    const resetBtn= document.getElementById('reset');
+
+    const tOut = document.getElementById('tOut');
+    const xOut = document.getElementById('xOut');
+    const vOut = document.getElementById('vOut');
+
+    const pista = document.getElementById('pista');
+    const auto  = document.getElementById('auto');
+    const escalaTxt = document.getElementById('escalaTxt');
+
+    const tbody = document.getElementById('tbody');
+
+    // --- Tabs ---
+    const simPage = document.getElementById('sim');
+    const teoPage = document.getElementById('teoria');
+    const tabSim = document.getElementById('tab-sim');
+    const tabTeo = document.getElementById('tab-teo');
+    function setTab(which){
+      const sim = which === 'sim';
+      simPage.classList.toggle('active', sim);
+      teoPage.classList.toggle('active', !sim);
+      tabSim.setAttribute('aria-selected', sim);
+      tabTeo.setAttribute('aria-selected', !sim);
+    }
+    tabSim.addEventListener('click', ()=>setTab('sim'));
+    tabTeo.addEventListener('click', ()=>setTab('teo'));
+
+    // --- Config global Chart.js (tema oscuro / layout fijo) ---
+    Chart.defaults.color = '#e5e5e5'; // <- FIX: sin "$1"
+    Chart.defaults.borderColor = '#333';
+    Chart.defaults.maintainAspectRatio = false;
+
+    function makeChart(ctx,label){
+      return new Chart(ctx,{
+        type:'line',
+        data:{labels:[], datasets:[{label, data:[], pointRadius:0, borderWidth:2, tension:0.15}]},
+        options:{
+          animation:false,
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+          scales:{
+            x:{title:{display:true,text:'t (s)'}, grid:{color:'#1f1f1f'}},
+            y:{title:{display:true,text:label}, grid:{color:'#141414'}}
+          }
+        }
+      });
+    }
+
+    const posChart = makeChart(document.getElementById('posChart'), 'x (m)');
+    const velChart = makeChart(document.getElementById('velChart'), 'v (m/s)');
+    const accChart = makeChart(document.getElementById('accChart'), 'a (m/s²)');
+
+    // --- Estado de simulación ---
+    let t=0, running=false, timer=null;
+    let x0=0, v0=0, a=0, dt=0.1, dur=10;
+    let xMin=0, xMax=10, scale=10; // m -> px
+
+    function readInputs(){
+      x0 = parseFloat(x0Input.value)||0;
+      v0 = parseFloat(v0Input.value)||0;
+      a  = (tipo.value==='mru') ? 0 : (parseFloat(aInput.value)||0);
+      if(tipo.value==='mru') { aInput.value = 0; aInput.disabled = true; }
+      else aInput.disabled = false;
+      dt = Math.max(0.01, parseFloat(dtInput.value)||0.1);
+      dur = Math.max(dt, parseFloat(durInput.value)||10);
+    }
+
+    function resetCharts(){
+      [posChart,velChart,accChart].forEach(ch=>{
+        ch.data.labels.length=0;
+        ch.data.datasets[0].data.length=0;
+        ch.update('none');
+      });
+    }
+
+    function resetTable(){ tbody.innerHTML=''; }
+
+    function estimateBounds(){
+      // Estimar x mínima y máxima para escalar la pista durante [0,dur]
+      const xAt = (tt)=> x0 + v0*tt + 0.5*a*tt*tt;
+      const candidates = [xAt(0), xAt(dur)];
+      if(Math.abs(a) > 1e-12){
+        const tVertex = -v0/a;
+        if(tVertex>=0 && tVertex<=dur){ candidates.push(xAt(tVertex)); }
+      }
+      xMin = Math.min(...candidates);
+      xMax = Math.max(...candidates);
+      if(xMax === xMin) xMax = xMin + 1; // evitar división por cero
+      const pistaPx = Math.max(50, pista.clientWidth - 56); // margen para el auto
+      scale = pistaPx / (xMax - xMin); // px por metro
+      escalaTxt.textContent = `Escala ≈ ${(1/scale).toFixed(2)} m/px | Rango [${xMin.toFixed(2)} , ${xMax.toFixed(2)}] m`;
+    }
+
+    function placeCar(x){
+      const px = (x - xMin) * scale;
+      auto.style.left = clamp(px, 0, pista.clientWidth - 40) + 'px';
+    }
+
+    function addRow(t,x,v,a){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${t.toFixed(2)}</td><td>${x.toFixed(2)}</td><td>${v.toFixed(2)}</td><td>${a.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    }
+
+    function step(){
+      t = +(t + dt).toFixed(6);
+      const x = x0 + v0*t + 0.5*a*t*t;
+      const v = v0 + a*t;
+      const acc = a;
+
+      // Indicadores
+      tOut.textContent = t.toFixed(2);
+      xOut.textContent = x.toFixed(2);
+      vOut.textContent = v.toFixed(2);
+
+      // Animación
+      placeCar(x);
+
+      // Gráficas
+      posChart.data.labels.push(t);
+      velChart.data.labels.push(t);
+      accChart.data.labels.push(t);
+      posChart.data.datasets[0].data.push(x);
+      velChart.data.datasets[0].data.push(v);
+      accChart.data.datasets[0].data.push(acc);
+      posChart.update('none');
+      velChart.update('none');
+      accChart.update('none');
+
+      // Tabla
+      addRow(t,x,v,acc);
+
+      // Fin
+      if(t >= dur - 1e-9){ stop(); }
+    }
+
+    function start(){
+      if(running) return;
+      readInputs();
+      if(t===0){ // arranque nuevo
+        estimateBounds();
+        placeCar(x0);
+        resetCharts();
+        resetTable();
+        // sembrar estado inicial (t=0)
+        posChart.data.labels.push(0); posChart.data.datasets[0].data.push(x0);
+        velChart.data.labels.push(0); velChart.data.datasets[0].data.push(v0);
+        accChart.data.labels.push(0); accChart.data.datasets[0].data.push(a);
+        posChart.update('none'); velChart.update('none'); accChart.update('none');
+        addRow(0,x0,v0,a);
+        tOut.textContent = '0.00';
+        xOut.textContent = x0.toFixed(2);
+        vOut.textContent = v0.toFixed(2);
+      }
+      running = true;
+      timer = setInterval(step, Math.max(16, dt*1000));
+    }
+
+    function stop(){ running=false; if(timer){ clearInterval(timer); timer=null; } }
+
+    function pause(){ if(!running) return; stop(); }
+
+    function reset(){
+      stop();
+      t = 0;
+      readInputs();
+      estimateBounds();
+      placeCar(x0);
+      tOut.textContent = '0.00';
+      xOut.textContent = (+x0).toFixed(2);
+      vOut.textContent = (+v0).toFixed(2);
+      resetCharts();
+      resetTable();
+    }
+
+    // Presets / Casos de prueba interactivos
+    function applyPreset(p){
+      tipo.value = p.tipo || 'mruv';
+      x0Input.value = p.x0;
+      v0Input.value = p.v0;
+      aInput.value  = p.a;
+      dtInput.value = p.dt;
+      durInput.value= p.dur;
+      reset();
+    }
+
+    document.querySelectorAll('[data-test]').forEach(btn=>{
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-test');
+        if(id==='mru-basico'){
+          applyPreset({tipo:'mru', x0:0, v0:5, a:0, dt:0.1, dur:2});
+        } else if(id==='mruv-acelerando'){
+          applyPreset({tipo:'mruv', x0:0, v0:0, a:2, dt:0.1, dur:2});
+        } else if(id==='mruv-frenado'){
+          applyPreset({tipo:'mruv', x0:0, v0:10, a:-5, dt:0.1, dur:4});
+        }
+        start();
+      });
+    });
+
+    // Eventos
+    startBtn.addEventListener('click', start);
+    pauseBtn.addEventListener('click', pause);
+    resetBtn.addEventListener('click', reset);
+    tipo.addEventListener('change', ()=>{ readInputs(); });
+    window.addEventListener('resize', ()=>{ estimateBounds(); placeCar(x0 + v0*t + 0.5*a*t*t); });
+
+    // Estado inicial
+    reset();
+
+    // --- Pruebas automáticas mínimas (no bloqueantes) ---
+    assert(!!Chart.defaults, 'Chart.js defaults está disponible');
+    assert(Chart.defaults.color === '#e5e5e5', 'Color por defecto de Chart.js aplicado (#e5e5e5)');
+    assert(Chart.defaults.maintainAspectRatio === false, 'maintainAspectRatio global = false');
+  </script>
+</body>
+</html>
